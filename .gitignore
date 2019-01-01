@@ -1,0 +1,5 @@
+.vscode/*
+Make*
+*.o
+moc_*
+*.qmake*
