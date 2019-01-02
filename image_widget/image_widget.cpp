@@ -1,6 +1,6 @@
 #include "image_widget.h"
 
-using cv::Mat, cv::Point, cv::Scalar, cv::namedWindow;
+using cv::Mat, cv::Point, cv::Scalar;
 
 /*
  *  Init all component widgets
@@ -19,6 +19,10 @@ ImageWidget::ImageWidget(QWidget *parent) : QWidget(parent)
     _buttonDelete           = new QPushButton(tr("Delete image"));
     _buttonHistOrdinary     = new QPushButton(tr("Ordinary"));
     _buttonHistCumulative   = new QPushButton(tr("Cumulative"));
+
+    //set histogram buttons properties
+    _buttonHistOrdinary->setProperty("ID", 1);
+    _buttonHistCumulative->setProperty("ID", 2);
 
     //init text window
     _imgName = new QLineEdit(); 
@@ -41,15 +45,26 @@ ImageWidget::ImageWidget(QWidget *parent) : QWidget(parent)
     connect(_buttonLoad, SIGNAL(clicked()), this, SLOT(loadImg()));         //pressing loading button
     connect(_buttonDelete, SIGNAL(clicked()), this, SLOT(deleteImg()));     //pressing delete button
     connect(_buttonHistOrdinary, SIGNAL(clicked()), this, SLOT(makeHistogram()));
+    connect(_buttonHistCumulative, SIGNAL(clicked()), this, SLOT(makeHistogram()));
+
 }
+
 
 /**
  *  Only free memory 
  */ 
 ImageWidget::~ImageWidget()
 {
-
+    delete _imgLabel;
+    delete _imgLabel;
+    delete _histLabel;
+    delete _histLabel;
+    delete _buttonLoad;
+    delete _buttonDelete;
+    delete _buttonHistOrdinary;
+    delete _buttonHistCumulative;
 }
+
 
 /**
  *   Invoked when Load Image Button is pressed
@@ -75,6 +90,7 @@ void ImageWidget::loadImg()
     qDebug() << "Image loaded successfully";
 }
 
+
 /**
  *  Invoked when Delete Image Button is pressed
  *  Unload image and display text
@@ -89,6 +105,7 @@ void ImageWidget::deleteImg()
     
 }
 
+
 /**
  *  Invoked when Delete Image Button is pressed
  *  Makes 3 channel histogram
@@ -96,59 +113,111 @@ void ImageWidget::deleteImg()
  */
 void ImageWidget::makeHistogram()
 {
-	Mat src;
-	src = cv::imread(_path.toStdString().c_str(), 1);    //QString -> C++11 string -> c string
+    QPushButton* button = qobject_cast<QPushButton*>(sender());
+    Q_ASSERT(button != NULL);
 
-	// Separate the image in 3 places ( B, G and R )
-	std::vector<cv::Mat> bgr_planes;
-	split(src, bgr_planes);
+    Mat src;
+    src = cv::imread(_path.toStdString().c_str(), 1);    //QString -> C++11 string -> c string
 
-	// Establish the number of bins
-	int histSize = 256;
+    // Separate the image in 3 places ( B, G and R )
+    std::vector<cv::Mat> bgr_planes;
+    split(src, bgr_planes);
 
-	// Set the ranges ( for B,G,R) )
-	float range[] = { 0, 256 };
-	const float* histRange = { range };
+    // Establish the number of bins
+    int histSize = 256;
 
-	bool uniform = true; bool accumulate = false;
+    // Set the ranges ( for B,G,R) )
+    float range[] = { 0, 256 };
+    const float* histRange = { range };
 
-	Mat b_hist, g_hist, r_hist;
+    bool uniform = true; bool accumulate = false;
 
-	// Compute the histograms:
-	calcHist(&bgr_planes[0], 1, 0, Mat(), b_hist, 1, &histSize, &histRange, uniform, accumulate);
-	calcHist(&bgr_planes[1], 1, 0, Mat(), g_hist, 1, &histSize, &histRange, uniform, accumulate);
-	calcHist(&bgr_planes[2], 1, 0, Mat(), r_hist, 1, &histSize, &histRange, uniform, accumulate);
+    Mat b_hist, g_hist, r_hist;
 
-	// Draw the histograms for B, G and R
-	int hist_w = 512; int hist_h = 400;
-	int bin_w = cvRound((double)hist_w / histSize);
+    // Compute the histograms:
+    calcHist(&bgr_planes[0], 1, 0, Mat(), b_hist, 1, &histSize, &histRange, uniform, accumulate);
+    calcHist(&bgr_planes[1], 1, 0, Mat(), g_hist, 1, &histSize, &histRange, uniform, accumulate);
+    calcHist(&bgr_planes[2], 1, 0, Mat(), r_hist, 1, &histSize, &histRange, uniform, accumulate);
 
-	cv::Mat histImage(hist_h, hist_w, CV_8UC3, cv::Scalar(0, 0, 0));
+    // Draw the histograms for B, G and R
+    int hist_w = 512; int hist_h = 400;
+    int bin_w = cvRound((double)hist_w / histSize);
 
-	// Normalize the result to [ 0, histImage.rows ]
-	normalize(b_hist, b_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, Mat());
-	normalize(g_hist, g_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, Mat());
-	normalize(r_hist, r_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, Mat());
+    cv::Mat histImage(hist_h, hist_w, CV_8UC3, cv::Scalar(0, 0, 0));
 
-	// Draw for each channel
-	for (int i = 1; i < histSize; i++)
-	{
-		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(b_hist.at<float>(i - 1))),
-			Point(bin_w*(i), hist_h - cvRound(b_hist.at<float>(i))),
-			Scalar(255, 0, 0), 2, 8, 0);
-		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(g_hist.at<float>(i - 1))),
-			Point(bin_w*(i), hist_h - cvRound(g_hist.at<float>(i))),
-			Scalar(0, 255, 0), 2, 8, 0);
-		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(r_hist.at<float>(i - 1))),
-			Point(bin_w*(i), hist_h - cvRound(r_hist.at<float>(i))),
-			Scalar(0, 0, 255), 2, 8, 0);
-	}
+    // Normalize the result to [ 0, histImage.rows ]
+    normalize(b_hist, b_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, Mat());
+    normalize(g_hist, g_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, Mat());
+    normalize(r_hist, r_hist, 0, histImage.rows, cv::NORM_MINMAX, -1, Mat());
 
-	//threshold
-	threshold(bgr_planes[0], bgr_planes[0], 130, 255, 0);
-	threshold(bgr_planes[2], bgr_planes[2], 160, 255, 0);
+    if(button->property("ID") == 1)     //draw ordinary histogram
+    {
+        // Draw for each channel
+        for (int i = 1; i < histSize; i++)
+        {
+            line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(b_hist.at<float>(i - 1))),
+                Point(bin_w*(i), hist_h - cvRound(b_hist.at<float>(i))),
+                Scalar(255, 0, 0), 2, 8, 0);
+            line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(g_hist.at<float>(i - 1))),
+                Point(bin_w*(i), hist_h - cvRound(g_hist.at<float>(i))),
+                Scalar(0, 255, 0), 2, 8, 0);
+            line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(r_hist.at<float>(i - 1))),
+                Point(bin_w*(i), hist_h - cvRound(r_hist.at<float>(i))),
+                Scalar(0, 0, 255), 2, 8, 0);
+        }
+    }
+    else if(button->property("ID") == 2)        //draw cumulative
+    {
+        cv::Mat accumulatedHist_b = b_hist.clone();
+        cv::Mat accumulatedHist_g = g_hist.clone();
+        cv::Mat accumulatedHist_r = r_hist.clone();
 
-	// Display
+        for (int i=1; i<histSize; ++i)      //acumulate to have 100% 
+        {
+            accumulatedHist_b.at<float>(i) += accumulatedHist_b.at<float>(i - 1);
+            accumulatedHist_g.at<float>(i) += accumulatedHist_g.at<float>(i - 1);
+            accumulatedHist_r.at<float>(i) += accumulatedHist_r.at<float>(i - 1);
+        }
+
+        
+        qDebug() << "Accumulated B: " << accumulatedHist_b.at<float>(histSize-1);
+        qDebug() << "Accumulated G: " << accumulatedHist_g.at<float>(histSize-1);
+        qDebug() << "Accumulated R: " << accumulatedHist_r.at<float>(histSize-1);
+
+        const double factor_b = hist_h / accumulatedHist_b.at<float>(histSize-1);
+        const double factor_g = hist_h / accumulatedHist_g.at<float>(histSize-1);
+        const double factor_r = hist_h / accumulatedHist_r.at<float>(histSize-1);
+
+        //after calculating factors, accumulate again.
+        accumulatedHist_b = b_hist.clone();
+        accumulatedHist_g = g_hist.clone();
+        accumulatedHist_r = r_hist.clone();
+
+        for (int i=1; i<histSize; ++i)  //draw
+        {
+            accumulatedHist_b.at<float>(i) += accumulatedHist_b.at<float>(i - 1);
+            accumulatedHist_g.at<float>(i) += accumulatedHist_g.at<float>(i - 1);
+            accumulatedHist_r.at<float>(i) += accumulatedHist_r.at<float>(i - 1);
+
+            line(histImage, Point(bin_w*(i - 1), hist_h - accumulatedHist_b.at<float>(i-1) * factor_b),
+                Point(bin_w*(i), hist_h - accumulatedHist_b.at<float>(i) * factor_b),
+                Scalar(255, 0, 0), 2, 8, 0);
+
+            line(histImage, Point(bin_w*(i - 1), hist_h - accumulatedHist_g.at<float>(i-1) * factor_g),
+                Point(bin_w*(i), hist_h - accumulatedHist_g.at<float>(i) * factor_g),
+                Scalar(0, 255, 0), 2, 8, 0);
+
+            line(histImage, Point(bin_w*(i - 1), hist_h - accumulatedHist_r.at<float>(i-1) * factor_r),
+                Point(bin_w*(i), hist_h - accumulatedHist_r.at<float>(i) * factor_r),
+                Scalar(0, 0, 255), 2, 8, 0);
+        }
+    }
+
+    //threshold
+    threshold(bgr_planes[0], bgr_planes[0], 130, 255, 0);
+    threshold(bgr_planes[2], bgr_planes[2], 160, 255, 0);
+
+    // Display
     //convert Mat -> QImage -> pixmap
     _histLabel->setPixmap(QPixmap::fromImage(QImage(histImage.data,
                                                     histImage.cols,
